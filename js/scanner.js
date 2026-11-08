@@ -14,7 +14,6 @@ function setupCanvas() {
   const container = document.getElementById('render-container');
   if (!canvas || !container) return;
 
-  // Match canvas dimensions to the full scrollable area of the math output
   const targetWidth = Math.max(container.clientWidth, container.scrollWidth, 600);
   const targetHeight = Math.max(container.clientHeight, container.scrollHeight, 400);
 
@@ -27,7 +26,6 @@ function setupCanvas() {
   window.removeEventListener('resize', syncCanvasSize);
   window.addEventListener('resize', syncCanvasSize);
 
-  // Touch and Pointer listeners for drawing
   canvas.onpointerdown = (e) => {
     if (currentMode !== 'draw') return;
     isDrawing = true;
@@ -83,11 +81,11 @@ function setInteractionMode(mode) {
   const btnScroll = document.getElementById('btn-mode-scroll');
 
   if (mode === 'scroll') {
-    canvas.style.pointerEvents = 'none'; // Enables touch drag scrolling on equation
+    canvas.style.pointerEvents = 'none';
     btnScroll.className = 'btn btn-small btn-primary';
     btnDraw.className = 'btn btn-small btn-secondary';
   } else {
-    canvas.style.pointerEvents = 'auto'; // Enables stylus/finger drawing
+    canvas.style.pointerEvents = 'auto';
     btnDraw.className = 'btn btn-small btn-primary';
     btnScroll.className = 'btn btn-small btn-secondary';
   }
@@ -100,7 +98,6 @@ function toggleImagePanel() {
 
   btn.textContent = isHidden ? '👁️ Show Image' : '◀ Hide Image';
 
-  // Allow CSS transition to complete before recalibrating canvas width
   setTimeout(() => {
     syncCanvasSize();
   }, 200);
@@ -135,7 +132,6 @@ function handleImageCapture(event) {
       img.classList.remove('hidden');
       placeholder.classList.add('hidden');
 
-      // Ultra-fast downscaling to 600px for instant server analysis
       const canvas = document.createElement('canvas');
       let width = tempImg.width;
       let height = tempImg.height;
@@ -156,7 +152,6 @@ function handleImageCapture(event) {
       const ctxTemp = canvas.getContext('2d');
       ctxTemp.drawImage(tempImg, 0, 0, width, height);
 
-      // Lightweight 50% JPEG quality (~30KB payload)
       const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.50);
       processImageWithAI(compressedDataUrl);
     };
@@ -185,7 +180,12 @@ async function processImageWithAI(base64Data) {
   }
 
   const base64Content = base64Data.split(',')[1];
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  
+  // Model Fallback Pipeline (tries primary, then fallback if 404 occurs)
+  const modelsToTry = [
+    'gemini-3.8-flash',
+    'gemini-3.5-flash-lite'
+  ];
 
   const payload = {
     contents: [{
@@ -200,52 +200,60 @@ async function processImageWithAI(base64Data) {
     }
   };
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  let lastError = null;
 
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
+  for (const modelName of modelsToTry) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    clearTimeout(timeoutId);
-    const data = await res.json();
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
 
-    if (!res.ok) {
-      alert(`API Error (${res.status}): ${data.error?.message || 'Request failed.'}`);
-      renderMath('3x^2 - 12x + 9 = 0');
-      return;
+      clearTimeout(timeoutId);
+      const data = await res.json();
+
+      if (res.ok) {
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+        if (!rawText) {
+          alert("No math equation detected. Snap a clearer picture.");
+          renderMath('3x^2 - 12x + 9 = 0');
+          return;
+        }
+
+        let cleanedLatex = rawText
+          .replace(/```latex/gi, '')
+          .replace(/```/g, '')
+          .replace(/\\\[|\\\]/g, '')
+          .replace(/\\\(|\\\)/g, '')
+          .trim();
+
+        renderMath(cleanedLatex);
+        clearCanvas();
+        return; // Successful response received, exit loop
+      } else {
+        lastError = data.error?.message || `Status ${res.status}`;
+        // If not a 404 model availability error (e.g. invalid key), exit immediately
+        if (res.status !== 404) {
+          alert(`API Error (${res.status}): ${lastError}`);
+          renderMath('3x^2 - 12x + 9 = 0');
+          return;
+        }
+      }
+    } catch (err) {
+      clearTimeout(timeoutId);
+      lastError = err.message;
     }
-
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-    if (!rawText) {
-      alert("No math equation detected. Snap a clearer picture.");
-      renderMath('3x^2 - 12x + 9 = 0');
-      return;
-    }
-
-    let cleanedLatex = rawText
-      .replace(/```latex/gi, '')
-      .replace(/```/g, '')
-      .replace(/\\\[|\\\]/g, '')
-      .replace(/\\\(|\\\)/g, '')
-      .trim();
-
-    renderMath(cleanedLatex);
-    clearCanvas();
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      alert("Request timed out after 10s. Try again.");
-    } else {
-      alert(`Connection Error: ${err.message}`);
-    }
-    renderMath('3x^2 - 12x + 9 = 0');
   }
+
+  alert(`Model/Connection Error: ${lastError || 'Failed to analyze image.'}`);
+  renderMath('3x^2 - 12x + 9 = 0');
 }
 
 function renderMath(latexString) {

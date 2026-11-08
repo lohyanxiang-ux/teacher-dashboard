@@ -30,7 +30,7 @@
             <button class="btn btn-small" onclick="loadDemoImage()">Load Demo Equation</button>
           </div>
         </div>
-        <!-- Visually hidden native file input (iOS camera compatible) -->
+        <!-- Native label-controlled input -->
         <input type="file" id="camera-input" accept="image/*" capture="environment" class="visually-hidden" onchange="handleImageCapture(event)">
       </section>
 
@@ -48,7 +48,7 @@
 
         <div class="latex-render-container" id="render-container">
           <div id="katex-output" class="katex-display"></div>
-          <!-- Canvas Overlay for Apple Pencil / Touch Markup -->
+          <!-- Canvas Overlay for Touch / Apple Pencil Markup -->
           <canvas id="markup-canvas"></canvas>
         </div>
 
@@ -61,6 +61,7 @@
   </div>
 
   <script src="js/state.js"></script>
-  <script src="js/scanner.js"></script>
+  <!-- Cache buster query appended to ensure immediate reload -->
+  <script src="js/scanner.js?v=3.8"></script>
 </body>
 </html>

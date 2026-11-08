@@ -93,10 +93,38 @@ async function processImageWithAI(base64Data) {
 
   const base64Content = base64Data.split(',')[1];
   
-  // Endpoint updated to gemini-3.8-flash
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+  // 1. Primary Attempt: Interactions API Endpoint
+  const interactionsUrl = `https://generativelanguage.googleapis.com/v1beta/interactions?key=${apiKey}`;
+  const interactionsPayload = {
+    model: "gemini-3.8-flash",
+    input: [
+      { type: "text", text: "Extract the mathematical equations from this image. Return ONLY raw valid LaTeX notation, no markdown code blocks (do not wrap in ```latex), no explanations, and no surrounding text." },
+      { type: "image", data: base64Content, mime_type: "image/jpeg" }
+    ]
+  };
 
-  const payload = {
+  try {
+    const res = await fetch(interactionsUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(interactionsPayload)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const rawText = data.output_text || (data.steps && data.steps[0]?.content[0]?.text) || "";
+      const cleanedLatex = rawText.replace(/```latex|```/g, '').trim();
+      renderMath(cleanedLatex);
+      clearCanvas();
+      return;
+    }
+  } catch (err) {
+    console.warn("Interactions API call failed, attempting generateContent fallback...", err);
+  }
+
+  // 2. Secondary Fallback: Standard generateContent Endpoint
+  const fallbackUrl = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=$){apiKey}`;
+  const fallbackPayload = {
     contents: [{
       parts: [
         { text: "Extract the mathematical equations from this image. Return ONLY raw valid LaTeX notation, no markdown code blocks (do not wrap in ```latex), no explanations, and no surrounding text." },
@@ -106,15 +134,14 @@ async function processImageWithAI(base64Data) {
   };
 
   try {
-    const res = await fetch(url, {
+    const res = await fetch(fallbackUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(fallbackPayload)
     });
 
     if (!res.ok) {
       const errData = await res.json();
-      console.error("Gemini API Error Response:", errData);
       alert(`API Error (${res.status}): ${errData.error?.message || 'Check connection or key.'}`);
       return;
     }

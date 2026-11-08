@@ -12,7 +12,6 @@ function setupCanvas() {
   const canvas = document.getElementById('markup-canvas');
   const container = document.getElementById('render-container');
   
-  // Set explicit canvas pixel resolution matching parent container
   canvas.width = container.clientWidth || 600;
   canvas.height = container.clientHeight || 400;
   
@@ -21,7 +20,6 @@ function setupCanvas() {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  // Handle window resizing
   window.addEventListener('resize', () => {
     const tempImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
     canvas.width = container.clientWidth;
@@ -32,7 +30,6 @@ function setupCanvas() {
     ctx.lineJoin = 'round';
   });
 
-  // Pointer events for Touch, Mouse, and Apple Pencil
   canvas.addEventListener('pointerdown', (e) => {
     isDrawing = true;
     const rect = canvas.getBoundingClientRect();
@@ -95,8 +92,15 @@ async function processImageWithAI(base64Data) {
   }
 
   const base64Content = base64Data.split(',')[1];
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
   
+  // Model cascade list to ensure continuous compatibility
+  const candidateModels = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash'
+  ];
+
   const payload = {
     contents: [{
       parts: [
@@ -106,30 +110,36 @@ async function processImageWithAI(base64Data) {
     }]
   };
 
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+  let lastErrorMessage = '';
 
-    if (!res.ok) {
-      const errData = await res.json();
-      console.error("Gemini API Error Response:", errData);
-      alert(`API Error (${res.status}): ${errData.error?.message || 'Check connection or key.'}`);
-      return;
-    }
-
-    const data = await res.json();
-    const rawText = data.candidates[0].content.parts[0].text.trim();
-    const cleanedLatex = rawText.replace(/```latex|```/g, '').trim();
+  for (const modelName of candidateModels) {
+    const url = `[https://generativelanguage.googleapis.com/v1beta/models/$](https://generativelanguage.googleapis.com/v1beta/models/$){modelName}:generateContent?key=${apiKey}`;
     
-    renderMath(cleanedLatex);
-    clearCanvas();
-  } catch (err) {
-    console.error("Network/Parsing Error:", err);
-    alert("Failed to analyze image. Please verify internet connection.");
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const rawText = data.candidates[0].content.parts[0].text.trim();
+        const cleanedLatex = rawText.replace(/```latex|```/g, '').trim();
+        
+        renderMath(cleanedLatex);
+        clearCanvas();
+        return; // Execution succeeded, exit function
+      } else {
+        const errData = await res.json();
+        lastErrorMessage = errData.error?.message || `Status ${res.status}`;
+      }
+    } catch (err) {
+      lastErrorMessage = err.message;
+    }
   }
+
+  alert(`API Error: ${lastErrorMessage}`);
 }
 
 function renderMath(latexString) {

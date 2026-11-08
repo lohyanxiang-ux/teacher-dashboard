@@ -292,3 +292,57 @@ body {
     overflow-y: auto;
   }
 }
+
+/* Navigation Left Alignment */
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Scanner Layout Full Width Mode */
+.scanner-layout.hide-image {
+  grid-template-columns: 1fr;
+}
+
+.scanner-layout.hide-image .camera-panel {
+  display: none !important;
+}
+
+/* Scrollable LaTeX Display Container */
+.latex-render-container {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background-color: #020617;
+  padding: 1.5rem;
+  overflow: auto; /* Enables vertical & horizontal scrolling */
+  -webkit-overflow-scrolling: touch;
+}
+
+.katex-display {
+  font-size: 2.2rem;
+  color: #fff;
+  z-index: 1;
+  pointer-events: none;
+  min-width: max-content;
+  margin: 0 auto;
+}
+
+#markup-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  cursor: crosshair;
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--bg-dark);
+  padding: 2px;
+  border-radius: 6px;
+}

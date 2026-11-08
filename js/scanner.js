@@ -1,6 +1,7 @@
 let strokeColor = '#ef4444';
 let isDrawing = false;
 let ctx = null;
+let cachedModelName = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   HubState.init();
@@ -84,6 +85,36 @@ function loadDemoImage() {
   renderMath('\\frac{3x^2 - 12x + 9}{3} = 0 \\implies x^2 - 4x + 3 = 0');
 }
 
+// Queries Google API to discover exact model names authorized for your key
+async function getAvailableModel(apiKey) {
+  if (cachedModelName) return cachedModelName;
+
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    
+    // Pick the first available flash model supporting generateContent
+    const flashModel = data.models?.find(m => 
+      m.supportedGenerationMethods?.includes('generateContent') && 
+      m.name.includes('flash')
+    );
+    
+    const validModel = flashModel || data.models?.find(m => 
+      m.supportedGenerationMethods?.includes('generateContent')
+    );
+
+    if (validModel) {
+      cachedModelName = validModel.name; // e.g., "models/gemini-2.5-flash" or "models/gemini-1.5-flash-001"
+      return cachedModelName;
+    }
+  } catch (err) {
+    console.warn("Could not query model list, defaulting to models/gemini-1.5-flash", err);
+  }
+
+  return "models/gemini-1.5-flash";
+}
+
 async function processImageWithAI(base64Data) {
   const apiKey = HubState.getApiKey();
   if (!apiKey) {
@@ -93,13 +124,9 @@ async function processImageWithAI(base64Data) {
 
   const base64Content = base64Data.split(',')[1];
   
-  // Model cascade list to ensure continuous compatibility
-  const candidateModels = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-flash'
-  ];
+  // Dynamically resolve model path
+  const modelPath = await getAvailableModel(apiKey);
+  const url = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{
@@ -110,36 +137,30 @@ async function processImageWithAI(base64Data) {
     }]
   };
 
-  let lastErrorMessage = '';
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-  for (const modelName of candidateModels) {
-    const url = `[https://generativelanguage.googleapis.com/v1beta/models/$](https://generativelanguage.googleapis.com/v1beta/models/$){modelName}:generateContent?key=${apiKey}`;
-    
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const rawText = data.candidates[0].content.parts[0].text.trim();
-        const cleanedLatex = rawText.replace(/```latex|```/g, '').trim();
-        
-        renderMath(cleanedLatex);
-        clearCanvas();
-        return; // Execution succeeded, exit function
-      } else {
-        const errData = await res.json();
-        lastErrorMessage = errData.error?.message || `Status ${res.status}`;
-      }
-    } catch (err) {
-      lastErrorMessage = err.message;
+    if (!res.ok) {
+      const errData = await res.json();
+      console.error("Gemini API Error Response:", errData);
+      alert(`API Error (${res.status}): ${errData.error?.message || 'Check connection or key.'}`);
+      return;
     }
-  }
 
-  alert(`API Error: ${lastErrorMessage}`);
+    const data = await res.json();
+    const rawText = data.candidates[0].content.parts[0].text.trim();
+    const cleanedLatex = rawText.replace(/```latex|```/g, '').trim();
+    
+    renderMath(cleanedLatex);
+    clearCanvas();
+  } catch (err) {
+    console.error("Network/Parsing Error:", err);
+    alert("Failed to analyze image. Please verify internet connection.");
+  }
 }
 
 function renderMath(latexString) {

@@ -1,52 +1,109 @@
 let strokeColor = '#ef4444';
 let isDrawing = false;
 let ctx = null;
+let currentMode = 'draw';
 
 document.addEventListener('DOMContentLoaded', () => {
   HubState.init();
   setupCanvas();
-  renderMath('3x^2 - 12x + 9 = 0');
+  renderMath('\\frac{3x^2 - 12x + 9}{3} = 0 \\implies x^2 - 4x + 3 = 0');
 });
 
 function setupCanvas() {
   const canvas = document.getElementById('markup-canvas');
   const container = document.getElementById('render-container');
-  
-  canvas.width = container.clientWidth || 600;
-  canvas.height = container.clientHeight || 400;
-  
+  if (!canvas || !container) return;
+
+  // Match canvas dimensions to the full scrollable area of the math output
+  const targetWidth = Math.max(container.clientWidth, container.scrollWidth, 600);
+  const targetHeight = Math.max(container.clientHeight, container.scrollHeight, 400);
+
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
   ctx = canvas.getContext('2d');
+  resetCtxStyle();
+
+  window.removeEventListener('resize', syncCanvasSize);
+  window.addEventListener('resize', syncCanvasSize);
+
+  // Touch and Pointer listeners for drawing
+  canvas.onpointerdown = (e) => {
+    if (currentMode !== 'draw') return;
+    isDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    const scrollLeft = container.scrollLeft;
+    const scrollTop = container.scrollTop;
+    
+    ctx.beginPath();
+    ctx.moveTo(e.clientX - rect.left + scrollLeft, e.clientY - rect.top + scrollTop);
+  };
+
+  canvas.onpointermove = (e) => {
+    if (!isDrawing || currentMode !== 'draw') return;
+    const rect = canvas.getBoundingClientRect();
+    const scrollLeft = container.scrollLeft;
+    const scrollTop = container.scrollTop;
+    
+    ctx.strokeStyle = strokeColor;
+    ctx.lineTo(e.clientX - rect.left + scrollLeft, e.clientY - rect.top + scrollTop);
+    ctx.stroke();
+  };
+
+  canvas.onpointerup = () => { isDrawing = false; };
+  canvas.onpointerleave = () => { isDrawing = false; };
+}
+
+function resetCtxStyle() {
+  if (!ctx) return;
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+}
 
-  window.addEventListener('resize', () => {
-    const tempImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    canvas.width = container.clientWidth;
-    canvas.height = container.clientHeight;
-    ctx.putImageData(tempImage, 0, 0);
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-  });
+function syncCanvasSize() {
+  const canvas = document.getElementById('markup-canvas');
+  const container = document.getElementById('render-container');
+  if (!canvas || !container || !ctx) return;
 
-  canvas.addEventListener('pointerdown', (e) => {
-    isDrawing = true;
-    const rect = canvas.getBoundingClientRect();
-    ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
-  });
+  const tempImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const targetWidth = Math.max(container.clientWidth, container.scrollWidth);
+  const targetHeight = Math.max(container.clientHeight, container.scrollHeight);
 
-  canvas.addEventListener('pointermove', (e) => {
-    if (!isDrawing) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.strokeStyle = strokeColor;
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-    ctx.stroke();
-  });
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  ctx.putImageData(tempImageData, 0, 0);
+  resetCtxStyle();
+}
 
-  canvas.addEventListener('pointerup', () => { isDrawing = false; });
-  canvas.addEventListener('pointerleave', () => { isDrawing = false; });
+function setInteractionMode(mode) {
+  currentMode = mode;
+  const canvas = document.getElementById('markup-canvas');
+  const btnDraw = document.getElementById('btn-mode-draw');
+  const btnScroll = document.getElementById('btn-mode-scroll');
+
+  if (mode === 'scroll') {
+    canvas.style.pointerEvents = 'none'; // Enables touch drag scrolling on equation
+    btnScroll.className = 'btn btn-small btn-primary';
+    btnDraw.className = 'btn btn-small btn-secondary';
+  } else {
+    canvas.style.pointerEvents = 'auto'; // Enables stylus/finger drawing
+    btnDraw.className = 'btn btn-small btn-primary';
+    btnScroll.className = 'btn btn-small btn-secondary';
+  }
+}
+
+function toggleImagePanel() {
+  const layout = document.querySelector('.scanner-layout');
+  const btn = document.getElementById('toggle-panel-btn');
+  const isHidden = layout.classList.toggle('hide-image');
+
+  btn.textContent = isHidden ? '👁️ Show Image' : '◀ Hide Image';
+
+  // Allow CSS transition to complete before recalibrating canvas width
+  setTimeout(() => {
+    syncCanvasSize();
+  }, 200);
 }
 
 function setPenColor(color) { 
@@ -55,7 +112,7 @@ function setPenColor(color) {
 
 function clearCanvas() {
   const canvas = document.getElementById('markup-canvas');
-  if (ctx) {
+  if (ctx && canvas) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   }
 }
@@ -68,7 +125,7 @@ function handleImageCapture(event) {
   const placeholder = document.getElementById('camera-placeholder');
   const output = document.getElementById('katex-output');
 
-  output.innerHTML = '<span style="color:#eab308; font-size: 1.4rem; font-weight:600;">⏳ Fast-processing equation...</span>';
+  output.innerHTML = '<span style="color:#eab308; font-size: 1.4rem; font-weight:600;">⚡ Fast processing...</span>';
 
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -78,11 +135,11 @@ function handleImageCapture(event) {
       img.classList.remove('hidden');
       placeholder.classList.add('hidden');
 
-      // Downscale aggressively (Max 800px) for fast mobile transmission
+      // Ultra-fast downscaling to 600px for instant server analysis
       const canvas = document.createElement('canvas');
       let width = tempImg.width;
       let height = tempImg.height;
-      const maxDim = 800;
+      const maxDim = 600;
 
       if (width > maxDim || height > maxDim) {
         if (width > height) {
@@ -99,8 +156,8 @@ function handleImageCapture(event) {
       const ctxTemp = canvas.getContext('2d');
       ctxTemp.drawImage(tempImg, 0, 0, width, height);
 
-      // Export low-bandwidth compressed JPEG payload
-      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.70);
+      // Lightweight 50% JPEG quality (~30KB payload)
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.50);
       processImageWithAI(compressedDataUrl);
     };
     tempImg.src = e.target.result;
@@ -128,22 +185,23 @@ async function processImageWithAI(base64Data) {
   }
 
   const base64Content = base64Data.split(',')[1];
-  
-  // Primary model endpoint
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{
       parts: [
-        { text: "Extract the mathematical equation from this image. Return ONLY raw valid LaTeX notation. Do not include markdown blocks (no ```latex), explanations, or surrounding text." },
+        { text: "Output ONLY raw valid LaTeX notation for the math in this image. No markdown, no fences, no text." },
         { inline_data: { mime_type: "image/jpeg", data: base64Content } }
       ]
-    }]
+    }],
+    generationConfig: {
+      temperature: 0.0,
+      maxOutputTokens: 256
+    }
   };
 
-  // 15-second network timeout controller
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
     const res = await fetch(url, {
@@ -157,7 +215,6 @@ async function processImageWithAI(base64Data) {
     const data = await res.json();
 
     if (!res.ok) {
-      console.error("Gemini API Error Response:", data);
       alert(`API Error (${res.status}): ${data.error?.message || 'Request failed.'}`);
       renderMath('3x^2 - 12x + 9 = 0');
       return;
@@ -166,12 +223,11 @@ async function processImageWithAI(base64Data) {
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
     if (!rawText) {
-      alert("No equation recognized. Please snap a clearer photo of the solution.");
+      alert("No math equation detected. Snap a clearer picture.");
       renderMath('3x^2 - 12x + 9 = 0');
       return;
     }
 
-    // Strip markdown code fences and enclosing brackets
     let cleanedLatex = rawText
       .replace(/```latex/gi, '')
       .replace(/```/g, '')
@@ -183,11 +239,10 @@ async function processImageWithAI(base64Data) {
     clearCanvas();
   } catch (err) {
     clearTimeout(timeoutId);
-    console.error("Scanner Error:", err);
     if (err.name === 'AbortError') {
-      alert("Request timed out after 15s. Please check your Wi-Fi signal and try again.");
+      alert("Request timed out after 10s. Try again.");
     } else {
-      alert(`Connection Error: ${err.message || 'Failed to reach AI service.'}`);
+      alert(`Connection Error: ${err.message}`);
     }
     renderMath('3x^2 - 12x + 9 = 0');
   }
@@ -201,4 +256,5 @@ function renderMath(latexString) {
   } catch (e) {
     output.textContent = latexString;
   }
+  syncCanvasSize();
 }

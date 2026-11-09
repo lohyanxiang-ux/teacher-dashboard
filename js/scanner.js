@@ -2,11 +2,15 @@ let strokeColor = '#ef4444';
 let isDrawing = false;
 let ctx = null;
 let currentMode = 'draw';
+let zoomScale = 1.0;
+let initialPinchDistance = null;
+let initialPinchScale = 1.0;
 
 document.addEventListener('DOMContentLoaded', () => {
   HubState.init();
   setupCanvas();
   setupClipboardPaste();
+  setupPinchZoom();
   renderMath('\\frac{3x^2 - 12x + 9}{3} = 0 \\implies x^2 - 4x + 3 = 0');
 });
 
@@ -27,6 +31,63 @@ function setupClipboardPaste() {
       }
     }
   });
+}
+
+// Pinch-to-zoom gesture handler for iPad touchscreens
+function setupPinchZoom() {
+  const container = document.getElementById('render-container');
+  if (!container) return;
+
+  container.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      initialPinchDistance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      initialPinchScale = zoomScale;
+    }
+  }, { passive: false });
+
+  container.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && initialPinchDistance) {
+      e.preventDefault(); // Prevent full page browser scaling
+      const currentDistance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+
+      const scaleFactor = currentDistance / initialPinchDistance;
+      const targetScale = Math.min(Math.max(initialPinchScale * scaleFactor, 0.5), 3.5);
+      setZoom(targetScale);
+    }
+  }, { passive: false });
+
+  container.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) {
+      initialPinchDistance = null;
+    }
+  });
+}
+
+function adjustZoom(delta) {
+  setZoom(zoomScale + delta);
+}
+
+function resetZoom() {
+  setZoom(1.0);
+}
+
+function setZoom(newScale) {
+  zoomScale = Math.min(Math.max(newScale, 0.5), 3.5);
+  const wrapper = document.getElementById('zoom-wrapper');
+  const label = document.getElementById('zoom-label');
+
+  if (wrapper) {
+    wrapper.style.transform = `scale(${zoomScale})`;
+  }
+  if (label) {
+    label.textContent = `${Math.round(zoomScale * 100)}%`;
+  }
 }
 
 function setupCanvas() {
@@ -53,8 +114,12 @@ function setupCanvas() {
     const scrollLeft = container.scrollLeft;
     const scrollTop = container.scrollTop;
     
+    // Scale touch coordinates proportionally to match current zoom scale
+    const x = (e.clientX - rect.left + scrollLeft) / zoomScale;
+    const y = (e.clientY - rect.top + scrollTop) / zoomScale;
+
     ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left + scrollLeft, e.clientY - rect.top + scrollTop);
+    ctx.moveTo(x, y);
   };
 
   canvas.onpointermove = (e) => {
@@ -63,8 +128,11 @@ function setupCanvas() {
     const scrollLeft = container.scrollLeft;
     const scrollTop = container.scrollTop;
     
+    const x = (e.clientX - rect.left + scrollLeft) / zoomScale;
+    const y = (e.clientY - rect.top + scrollTop) / zoomScale;
+
     ctx.strokeStyle = strokeColor;
-    ctx.lineTo(e.clientX - rect.left + scrollLeft, e.clientY - rect.top + scrollTop);
+    ctx.lineTo(x, y);
     ctx.stroke();
   };
 
@@ -101,11 +169,11 @@ function setInteractionMode(mode) {
   const btnScroll = document.getElementById('btn-mode-scroll');
 
   if (mode === 'scroll') {
-    canvas.style.pointerEvents = 'none';
+    canvas.style.pointerEvents = 'none'; // Disables drawing to allow scrolling & pinch-to-zoom
     btnScroll.className = 'btn btn-small btn-primary';
     btnDraw.className = 'btn btn-small btn-secondary';
   } else {
-    canvas.style.pointerEvents = 'auto';
+    canvas.style.pointerEvents = 'auto'; // Enables stylus & finger drawing
     btnDraw.className = 'btn btn-small btn-primary';
     btnScroll.className = 'btn btn-small btn-secondary';
   }
@@ -142,7 +210,7 @@ function handleImageCapture(event) {
   const placeholder = document.getElementById('camera-placeholder');
   const output = document.getElementById('katex-output');
 
-  output.innerHTML = '<span style="color:#eab308; font-size: 1.4rem; font-weight:600;">⚡ Processing screenshot...</span>';
+  output.innerHTML = '<span style="color:#eab308; font-size: 1.4rem; font-weight:600;">⚡ Processing image...</span>';
 
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -206,11 +274,10 @@ async function processImageWithAI(base64Data) {
     'gemini-3.5-flash-lite'
   ];
 
-  // Prompt tuned to ignore software interface frames (e.g. OneNote navigation)
   const payload = {
     contents: [{
       parts: [
-        { text: "Extract the mathematical equation from this image or screenshot. Ignore any application toolbars, surrounding menus, or margin text. Output ONLY raw valid LaTeX notation. No markdown code blocks, no explanations." },
+        { text: "Extract the mathematical equation from this image or screenshot. Ignore application toolbars, surrounding menus, or margin text. Output ONLY raw valid LaTeX notation. No markdown code blocks, no explanations." },
         { inline_data: { mime_type: "image/jpeg", data: base64Content } }
       ]
     }],

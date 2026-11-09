@@ -33,6 +33,7 @@ const HubState = {
     localStorage.setItem('math_current_class', className);
   },
 
+  // Active Pool Management
   getActivePool(className) {
     const poolKey = `math_pool_${className}`;
     const stored = localStorage.getItem(poolKey);
@@ -48,9 +49,32 @@ const HubState = {
     localStorage.setItem(`math_pool_${className}`, JSON.stringify(poolArray));
   },
 
+  // Mastered List Management
+  getMasteredList(className) {
+    const key = `math_mastered_${className}`;
+    return JSON.parse(localStorage.getItem(key) || '[]');
+  },
+
+  setMasteredList(className, listArray) {
+    localStorage.setItem(`math_mastered_${className}`, JSON.stringify(listArray));
+  },
+
+  // Recheck Queue Management
+  getRecheckQueue(className) {
+    const key = `math_recheck_${className}`;
+    return JSON.parse(localStorage.getItem(key) || '[]');
+  },
+
+  setRecheckQueue(className, queueArray) {
+    localStorage.setItem(`math_recheck_${className}`, JSON.stringify(queueArray));
+  },
+
+  // Full Reset to start a new cycle
   resetActivePool(className) {
     const fullRoster = this.getRoster(className);
     localStorage.setItem(`math_pool_${className}`, JSON.stringify(fullRoster));
+    localStorage.setItem(`math_mastered_${className}`, JSON.stringify([]));
+    localStorage.setItem(`math_recheck_${className}`, JSON.stringify([]));
   },
 
   getApiKey() {
@@ -58,6 +82,6 @@ const HubState = {
   },
 
   setApiKey(key) {
-    localStorage.setItem('gemini_api_key', key);
+    localStorage.setItem('gemini_api_key', key.trim());
   }
 };

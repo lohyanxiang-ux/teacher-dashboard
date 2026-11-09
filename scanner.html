@@ -19,9 +19,7 @@
       </div>
       <div class="title">📸 Handwriting & Screenshot Scanner</div>
       <div class="nav-actions">
-        <!-- Button 1: Camera Trigger -->
         <label for="camera-input" class="btn btn-secondary" style="cursor: pointer;">📷 Camera</label>
-        <!-- Button 2: Photo Library / Screenshot Picker -->
         <label for="file-input" class="btn btn-primary" style="cursor: pointer;">🖼️ Screenshot / File</label>
       </div>
     </header>
@@ -38,14 +36,12 @@
               <label for="file-input" class="btn btn-primary" style="cursor: pointer;">🖼️ Select Screenshot</label>
               <label for="camera-input" class="btn btn-secondary" style="cursor: pointer;">📷 Open Camera</label>
             </div>
-            <small style="color: var(--text-muted);">Tip: You can also paste copied screenshots directly (⌘V)</small>
+            <small style="color: var(--text-muted);">Tip: You can paste copied screenshots directly (⌘V)</small>
             <button class="btn btn-small" onclick="loadDemoImage()">Load Demo Equation</button>
           </div>
         </div>
         
-        <!-- Camera-only capture input -->
         <input type="file" id="camera-input" accept="image/*" capture="environment" class="visually-hidden" onchange="handleImageCapture(event)">
-        <!-- Photo Library & Screenshot file picker -->
         <input type="file" id="file-input" accept="image/*" class="visually-hidden" onchange="handleImageCapture(event)">
       </section>
 
@@ -54,8 +50,16 @@
         <div class="panel-header">
           <div class="mode-toggle">
             <button class="btn btn-small btn-primary" id="btn-mode-draw" onclick="setInteractionMode('draw')">✏️ Draw</button>
-            <button class="btn btn-small btn-secondary" id="btn-mode-scroll" onclick="setInteractionMode('scroll')">✋ Scroll</button>
+            <button class="btn btn-small btn-secondary" id="btn-mode-scroll" onclick="setInteractionMode('scroll')">✋ Scroll / Pinch</button>
           </div>
+          
+          <!-- Zoom Controls -->
+          <div class="zoom-controls">
+            <button class="btn btn-small" onclick="adjustZoom(-0.25)">🔍−</button>
+            <span id="zoom-label" class="zoom-indicator" onclick="resetZoom()">100%</span>
+            <button class="btn btn-small" onclick="adjustZoom(0.25)">🔍+</button>
+          </div>
+
           <div class="canvas-tools">
             <button class="btn btn-small" onclick="setPenColor('#ef4444')">🔴 Red</button>
             <button class="btn btn-small" onclick="setPenColor('#3b82f6')">🔵 Blue</button>
@@ -65,8 +69,11 @@
         </div>
 
         <div class="latex-render-container" id="render-container">
-          <div id="katex-output" class="katex-display"></div>
-          <canvas id="markup-canvas"></canvas>
+          <!-- Zoom Wrapper scales KaTeX & Canvas Markup synchronously -->
+          <div class="math-zoom-wrapper" id="zoom-wrapper">
+            <div id="katex-output" class="katex-display"></div>
+            <canvas id="markup-canvas"></canvas>
+          </div>
         </div>
 
         <div class="latex-code-bar">
@@ -78,6 +85,6 @@
   </div>
 
   <script src="js/state.js"></script>
-  <script src="js/scanner.js?v=7.0"></script>
+  <script src="js/scanner.js?v=8.0"></script>
 </body>
 </html>

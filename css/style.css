@@ -346,3 +346,15 @@ body {
   padding: 2px;
   border-radius: 6px;
 }
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.placeholder-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}

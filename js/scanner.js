@@ -6,8 +6,28 @@ let currentMode = 'draw';
 document.addEventListener('DOMContentLoaded', () => {
   HubState.init();
   setupCanvas();
+  setupClipboardPaste();
   renderMath('\\frac{3x^2 - 12x + 9}{3} = 0 \\implies x^2 - 4x + 3 = 0');
 });
+
+// Enable direct clipboard pasting of screenshots (⌘V or iPad paste)
+function setupClipboardPaste() {
+  window.addEventListener('paste', (e) => {
+    const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.indexOf('image') !== -1) {
+        const file = item.getAsFile();
+        if (file) {
+          const fakeEvent = { target: { files: [file] } };
+          handleImageCapture(fakeEvent);
+        }
+        break;
+      }
+    }
+  });
+}
 
 function setupCanvas() {
   const canvas = document.getElementById('markup-canvas');
@@ -122,7 +142,7 @@ function handleImageCapture(event) {
   const placeholder = document.getElementById('camera-placeholder');
   const output = document.getElementById('katex-output');
 
-  output.innerHTML = '<span style="color:#eab308; font-size: 1.4rem; font-weight:600;">⚡ Fast processing...</span>';
+  output.innerHTML = '<span style="color:#eab308; font-size: 1.4rem; font-weight:600;">⚡ Processing screenshot...</span>';
 
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -135,7 +155,7 @@ function handleImageCapture(event) {
       const canvas = document.createElement('canvas');
       let width = tempImg.width;
       let height = tempImg.height;
-      const maxDim = 600;
+      const maxDim = 800;
 
       if (width > maxDim || height > maxDim) {
         if (width > height) {
@@ -152,7 +172,7 @@ function handleImageCapture(event) {
       const ctxTemp = canvas.getContext('2d');
       ctxTemp.drawImage(tempImg, 0, 0, width, height);
 
-      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.50);
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
       processImageWithAI(compressedDataUrl);
     };
     tempImg.src = e.target.result;
@@ -181,16 +201,16 @@ async function processImageWithAI(base64Data) {
 
   const base64Content = base64Data.split(',')[1];
   
-  // Model Fallback Pipeline (tries primary, then fallback if 404 occurs)
   const modelsToTry = [
     'gemini-3.8-flash',
     'gemini-3.5-flash-lite'
   ];
 
+  // Prompt tuned to ignore software interface frames (e.g. OneNote navigation)
   const payload = {
     contents: [{
       parts: [
-        { text: "Output ONLY raw valid LaTeX notation for the math in this image. No markdown, no fences, no text." },
+        { text: "Extract the mathematical equation from this image or screenshot. Ignore any application toolbars, surrounding menus, or margin text. Output ONLY raw valid LaTeX notation. No markdown code blocks, no explanations." },
         { inline_data: { mime_type: "image/jpeg", data: base64Content } }
       ]
     }],
@@ -222,7 +242,7 @@ async function processImageWithAI(base64Data) {
         const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
         if (!rawText) {
-          alert("No math equation detected. Snap a clearer picture.");
+          alert("No math equation detected in screenshot.");
           renderMath('3x^2 - 12x + 9 = 0');
           return;
         }
@@ -236,10 +256,9 @@ async function processImageWithAI(base64Data) {
 
         renderMath(cleanedLatex);
         clearCanvas();
-        return; // Successful response received, exit loop
+        return;
       } else {
         lastError = data.error?.message || `Status ${res.status}`;
-        // If not a 404 model availability error (e.g. invalid key), exit immediately
         if (res.status !== 404) {
           alert(`API Error (${res.status}): ${lastError}`);
           renderMath('3x^2 - 12x + 9 = 0');
@@ -252,7 +271,7 @@ async function processImageWithAI(base64Data) {
     }
   }
 
-  alert(`Model/Connection Error: ${lastError || 'Failed to analyze image.'}`);
+  alert(`Model/Connection Error: ${lastError || 'Failed to analyze screenshot.'}`);
   renderMath('3x^2 - 12x + 9 = 0');
 }
 

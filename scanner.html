@@ -17,23 +17,36 @@
         <a href="index.html" class="nav-back">← Home</a>
         <button class="btn btn-secondary btn-small" id="toggle-panel-btn" onclick="toggleImagePanel()">◀ Hide Image</button>
       </div>
-      <div class="title">📸 Handwriting-to-LaTeX Scanner</div>
-      <label for="camera-input" class="btn btn-primary" style="cursor: pointer;">📷 Take Photo</label>
+      <div class="title">📸 Handwriting & Screenshot Scanner</div>
+      <div class="nav-actions">
+        <!-- Button 1: Camera Trigger -->
+        <label for="camera-input" class="btn btn-secondary" style="cursor: pointer;">📷 Camera</label>
+        <!-- Button 2: Photo Library / Screenshot Picker -->
+        <label for="file-input" class="btn btn-primary" style="cursor: pointer;">🖼️ Screenshot / File</label>
+      </div>
     </header>
 
     <main class="scanner-layout">
-      <!-- Image Capture Panel -->
+      <!-- Image Source Panel -->
       <section class="panel camera-panel" id="camera-panel">
         <div class="panel-header">Raw Image Source</div>
         <div class="image-container" id="image-container">
           <img id="captured-image" class="hidden" alt="Student Work">
           <div id="camera-placeholder" class="placeholder-box">
-            <span>No Image Captured</span>
-            <label for="camera-input" class="btn btn-secondary" style="cursor: pointer;">Open iPad Camera</label>
+            <span>No Image Loaded</span>
+            <div class="placeholder-actions">
+              <label for="file-input" class="btn btn-primary" style="cursor: pointer;">🖼️ Select Screenshot</label>
+              <label for="camera-input" class="btn btn-secondary" style="cursor: pointer;">📷 Open Camera</label>
+            </div>
+            <small style="color: var(--text-muted);">Tip: You can also paste copied screenshots directly (⌘V)</small>
             <button class="btn btn-small" onclick="loadDemoImage()">Load Demo Equation</button>
           </div>
         </div>
+        
+        <!-- Camera-only capture input -->
         <input type="file" id="camera-input" accept="image/*" capture="environment" class="visually-hidden" onchange="handleImageCapture(event)">
+        <!-- Photo Library & Screenshot file picker -->
+        <input type="file" id="file-input" accept="image/*" class="visually-hidden" onchange="handleImageCapture(event)">
       </section>
 
       <!-- LaTeX Render & Canvas Markup Panel -->
@@ -65,6 +78,6 @@
   </div>
 
   <script src="js/state.js"></script>
-  <script src="js/scanner.js?v=5.0"></script>
+  <script src="js/scanner.js?v=7.0"></script>
 </body>
 </html>

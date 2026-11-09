@@ -18,58 +18,70 @@
     </header>
 
     <main class="dashboard-grid">
-      <!-- Feature Card 1: Smart Name Caller -->
       <a href="picker.html" class="feature-card">
         <div class="card-icon">🎯</div>
         <div class="card-title">Smart Name Caller</div>
-        <div class="card-desc">Randomized student selection with traffic-light tracking and wait-time timers.</div>
+        <div class="card-desc">Randomized student selection with traffic-light tracking across lessons.</div>
         <div class="card-badge" id="picker-status">Ready</div>
       </a>
 
-      <!-- Feature Card 2: LaTeX Homework Scanner -->
       <a href="scanner.html" class="feature-card">
         <div class="card-icon">📸</div>
         <div class="card-title">LaTeX Scanner</div>
-        <div class="card-desc">Snap photos of handwritten working, convert to LaTeX, and annotate with Apple Pencil.</div>
+        <div class="card-desc">Snap photos or screenshots of student working, convert to LaTeX, and annotate.</div>
         <div class="card-badge">AI Powered</div>
       </a>
-
-      <!-- Placeholder Future Tool -->
-      <div class="feature-card disabled">
-        <div class="card-icon">👥</div>
-        <div class="card-title">Group Generator</div>
-        <div class="card-desc">Instantly split classes into mixed-ability pairs or trios with custom rules.</div>
-        <div class="card-badge gray">Coming Soon</div>
-      </div>
     </main>
   </div>
 
   <!-- Settings Modal -->
   <div id="settings-modal" class="modal hidden">
-    <div class="modal-content">
-      <h2>⚙️ Settings & Rosters</h2>
+    <div class="modal-content modal-large">
+      <h2>⚙️ Settings & Multi-Class Rosters</h2>
       
       <div class="form-group">
         <label for="api-key">Gemini Vision API Key:</label>
-        <input type="password" id="api-key" placeholder="AIZASy..." class="input-field">
-        <small>Saved locally in your browser. Used for handwriting recognition.</small>
+        <input type="password" id="api-key" placeholder="Paste key here..." class="input-field">
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid #334155; margin: 1.5rem 0;">
+
+      <!-- Class Selector / Editor Section -->
+      <div class="class-editor-header">
+        <div class="form-group flex-grow">
+          <label for="edit-class-select">Select Class to Edit / Manage:</label>
+          <select id="edit-class-select" class="dropdown input-field" onchange="loadClassToEditor(this.value)"></select>
+        </div>
+        <button class="btn btn-secondary" onclick="createNewClassPrompt()">➕ New Class</button>
+        <button class="btn btn-red" onclick="deleteSelectedClass()">🗑️ Delete</button>
       </div>
 
       <div class="form-group">
         <label for="roster-class-name">Class Name:</label>
-        <input type="text" id="roster-class-name" value="Class 3A" class="input-field">
+        <input type="text" id="roster-class-name" class="input-field">
       </div>
 
       <div class="form-group">
         <label for="roster-names">Student Names (One per line):</label>
-        <textarea id="roster-names" rows="8" class="input-field" placeholder="Alex Tan
+        <textarea id="roster-names" rows="6" class="input-field" placeholder="Alex Tan
 Sarah Lim
 Marcus Wong"></textarea>
       </div>
 
+      <details class="bulk-import-section">
+        <summary style="cursor: pointer; font-weight: 600; color: var(--primary);">📥 Bulk JSON Import (All Classes at Once)</summary>
+        <div class="form-group" style="margin-top: 0.75rem;">
+          <textarea id="bulk-json-input" rows="5" class="input-field" placeholder='{
+  "Class 3A": ["Alex", "Sarah", "Marcus"],
+  "Class 3B": ["Ethan", "Chloe", "Hassan"]
+}'></textarea>
+          <button class="btn btn-small btn-secondary" style="margin-top: 0.5rem;" onclick="processBulkImport()">Import JSON Roster</button>
+        </div>
+      </details>
+
       <div class="modal-actions">
         <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveRosterSettings()">Save Settings</button>
+        <button class="btn btn-primary" onclick="saveRosterSettings()">Save Class Settings</button>
       </div>
     </div>
   </div>
@@ -86,6 +98,7 @@ Marcus Wong"></textarea>
       const select = document.getElementById('class-select');
       select.innerHTML = '';
       const classes = HubState.getClasses();
+
       classes.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c;
@@ -93,14 +106,72 @@ Marcus Wong"></textarea>
         if (c === HubState.currentClass) opt.selected = true;
         select.appendChild(opt);
       });
-      select.onchange = (e) => HubState.setCurrentClass(e.target.value);
+
+      select.onchange = (e) => {
+        HubState.setCurrentClass(e.target.value);
+        updateDashboardBadges();
+      };
     }
 
     function openSettings() {
       document.getElementById('api-key').value = HubState.getApiKey();
-      document.getElementById('roster-class-name').value = HubState.currentClass;
-      document.getElementById('roster-names').value = HubState.getRoster(HubState.currentClass).join('\n');
+      populateEditClassDropdown();
+      loadClassToEditor(HubState.currentClass);
       document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    function populateEditClassDropdown() {
+      const select = document.getElementById('edit-class-select');
+      select.innerHTML = '';
+      const classes = HubState.getClasses();
+
+      classes.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        select.appendChild(opt);
+      });
+    }
+
+    function loadClassToEditor(className) {
+      document.getElementById('edit-class-select').value = className;
+      document.getElementById('roster-class-name').value = className;
+      document.getElementById('roster-names').value = HubState.getRoster(className).join('\n');
+    }
+
+    function createNewClassPrompt() {
+      const name = prompt("Enter new Class Name (e.g., Class 4B):");
+      if (name && name.trim()) {
+        const cleanName = name.trim();
+        HubState.setRoster(cleanName, []);
+        populateEditClassDropdown();
+        loadClassToEditor(cleanName);
+      }
+    }
+
+    function deleteSelectedClass() {
+      const className = document.getElementById('edit-class-select').value;
+      if (!className) return;
+
+      if (confirm(`Are you sure you want to delete ${className}? This will wipe its roster and progress.`)) {
+        HubState.deleteClass(className);
+        populateClassDropdown();
+        populateEditClassDropdown();
+        loadClassToEditor(HubState.currentClass);
+      }
+    }
+
+    function processBulkImport() {
+      const rawJson = document.getElementById('bulk-json-input').value.trim();
+      if (!rawJson) return;
+
+      if (HubState.importBulkRosters(rawJson)) {
+        alert("Classes imported successfully!");
+        populateClassDropdown();
+        populateEditClassDropdown();
+        loadClassToEditor(HubState.currentClass);
+        document.getElementById('bulk-json-input').value = '';
+      }
     }
 
     function closeSettings() {
@@ -120,6 +191,7 @@ Marcus Wong"></textarea>
         HubState.setRoster(className, names);
         HubState.setCurrentClass(className);
       }
+
       closeSettings();
       populateClassDropdown();
       updateDashboardBadges();
@@ -127,7 +199,7 @@ Marcus Wong"></textarea>
 
     function updateDashboardBadges() {
       const activePool = HubState.getActivePool(HubState.currentClass);
-      document.getElementById('picker-status').textContent = `${activePool.length} Active Students`;
+      document.getElementById('picker-status').textContent = `${activePool.length} Active Students (${HubState.currentClass})`;
     }
   </script>
 </body>

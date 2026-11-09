@@ -11,7 +11,10 @@
     <header class="top-nav">
       <a href="index.html" class="nav-back">← Home</a>
       <div class="title">🎯 Smart Name Caller</div>
-      <div class="pool-stats" id="pool-stats">Pool: 0 | Done: 0</div>
+      <div class="nav-actions">
+        <button class="btn btn-secondary btn-small" onclick="openStatusModal()">📋 Roster Lists</button>
+        <div class="pool-stats" id="pool-stats">Active: 0 | Mastered: 0</div>
+      </div>
     </header>
 
     <main class="picker-layout">
@@ -19,8 +22,9 @@
       <section class="picker-console">
         <button class="btn btn-huge" id="draw-btn" onclick="drawStudent()">🎲 DRAW STUDENT</button>
         
-        <div class="student-card" id="student-display">
-          <span class="placeholder">Tap Draw to Pick a Student</span>
+        <!-- Extra Large Display Box for Selected Student -->
+        <div class="student-card mega-display" id="student-display">
+          <span class="placeholder">Tap Draw to Pick</span>
         </div>
 
         <div class="timer-section">
@@ -32,24 +36,58 @@
           </div>
         </div>
 
-        <!-- Marking Buttons -->
+        <!-- Tagging Action Buttons -->
         <div class="response-actions">
-          <button class="btn btn-green" onclick="markResponse('green')">🟢 Mastered (Done)</button>
-          <button class="btn btn-yellow" onclick="markResponse('yellow')">🟡 Pass (Keep in Pool)</button>
-          <button class="btn btn-red" onclick="markResponse('red')">🔴 Re-check Queue</button>
+          <button class="btn btn-green btn-action-large" onclick="markResponse('green')">🟢 Mastered (Remove)</button>
+          <button class="btn btn-yellow btn-action-large" onclick="markResponse('yellow')">🟡 Pass (Call Soon)</button>
+          <button class="btn btn-red btn-action-large" onclick="markResponse('red')">🔴 Re-check Queue</button>
         </div>
       </section>
 
       <!-- Sidebar Queue -->
       <aside class="sidebar-queue">
-        <h3>📌 Re-check Queue</h3>
+        <div class="queue-header">
+          <h3>📌 Re-check Queue</h3>
+          <span class="queue-badge" id="recheck-count">0</span>
+        </div>
         <ul id="recheck-list" class="queue-list"></ul>
-        <button class="btn btn-small" onclick="resetClassPool()">🔄 Reset Active Pool</button>
+        <button class="btn btn-small btn-secondary" onclick="resetClassPool()">🔄 Force Reset Cycle</button>
       </aside>
     </main>
   </div>
 
+  <!-- Detailed Roster Status Modal -->
+  <div id="status-modal" class="modal hidden">
+    <div class="modal-content modal-large">
+      <h2>📋 Class Status Breakdown</h2>
+      
+      <div class="status-grid">
+        <!-- Active Pool Column -->
+        <div class="status-column">
+          <h3 class="status-title active-title">🎲 Active Pool (<span id="count-active">0</span>)</h3>
+          <ul id="list-active" class="status-list"></ul>
+        </div>
+
+        <!-- Recheck Queue Column -->
+        <div class="status-column">
+          <h3 class="status-title recheck-title">🔴 Re-check Queue (<span id="count-recheck">0</span>)</h3>
+          <ul id="list-recheck" class="status-list"></ul>
+        </div>
+
+        <!-- Mastered Column -->
+        <div class="status-column">
+          <h3 class="status-title mastered-title">🟢 Mastered (<span id="count-mastered">0</span>)</h3>
+          <ul id="list-mastered" class="status-list"></ul>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeStatusModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/state.js"></script>
-  <script src="js/picker.js"></script>
+  <script src="js/picker.js?v=2.0"></script>
 </body>
 </html>

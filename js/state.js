@@ -4,7 +4,9 @@ const HubState = {
   init() {
     if (!localStorage.getItem('math_rosters')) {
       const defaultRosters = {
-        'Class 3A': ['Alex Tan', 'Sarah Lim', 'Marcus Wong', 'Priyah Kumar', 'David Chen', 'Rachel Goh']
+        'Class 3A': ['Alex Tan', 'Sarah Lim', 'Marcus Wong', 'Priyah Kumar', 'David Chen', 'Rachel Goh'],
+        'Class 3B': ['Ethan Ong', 'Chloe Lee', 'Hassan Ali', 'Megan Teo', 'Lucas Vance'],
+        'Class 4A': ['Benjamin Wright', 'Aaliyah Jones', 'Caleb Smith', 'Zoe Taylor']
       };
       localStorage.setItem('math_rosters', JSON.stringify(defaultRosters));
     }
@@ -28,12 +30,51 @@ const HubState = {
     this.resetActivePool(className);
   },
 
+  deleteClass(className) {
+    const rosters = JSON.parse(localStorage.getItem('math_rosters') || '{}');
+    delete rosters[className];
+    localStorage.setItem('math_rosters', JSON.stringify(rosters));
+    
+    // Clear associated storage keys
+    localStorage.removeItem(`math_pool_${className}`);
+    localStorage.removeItem(`math_mastered_${className}`);
+    localStorage.removeItem(`math_recheck_${className}`);
+
+    const remaining = Object.keys(rosters);
+    if (remaining.length > 0) {
+      this.setCurrentClass(remaining[0]);
+    }
+  },
+
+  importBulkRosters(jsonString) {
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error("Invalid format. Expected a JSON object of class rosters.");
+      }
+
+      const rosters = JSON.parse(localStorage.getItem('math_rosters') || '{}');
+      
+      for (const [className, names] of Object.entries(parsed)) {
+        if (Array.isArray(names)) {
+          rosters[className] = names.map(n => String(n).trim()).filter(n => n.length > 0);
+          this.resetActivePool(className);
+        }
+      }
+
+      localStorage.setItem('math_rosters', JSON.stringify(rosters));
+      return true;
+    } catch (err) {
+      alert(`Import Error: ${err.message}`);
+      return false;
+    }
+  },
+
   setCurrentClass(className) {
     this.currentClass = className;
     localStorage.setItem('math_current_class', className);
   },
 
-  // Active Pool Management
   getActivePool(className) {
     const poolKey = `math_pool_${className}`;
     const stored = localStorage.getItem(poolKey);
@@ -49,27 +90,22 @@ const HubState = {
     localStorage.setItem(`math_pool_${className}`, JSON.stringify(poolArray));
   },
 
-  // Mastered List Management
   getMasteredList(className) {
-    const key = `math_mastered_${className}`;
-    return JSON.parse(localStorage.getItem(key) || '[]');
+    return JSON.parse(localStorage.getItem(`math_mastered_${className}`) || '[]');
   },
 
   setMasteredList(className, listArray) {
     localStorage.setItem(`math_mastered_${className}`, JSON.stringify(listArray));
   },
 
-  // Recheck Queue Management
   getRecheckQueue(className) {
-    const key = `math_recheck_${className}`;
-    return JSON.parse(localStorage.getItem(key) || '[]');
+    return JSON.parse(localStorage.getItem(`math_recheck_${className}`) || '[]');
   },
 
   setRecheckQueue(className, queueArray) {
     localStorage.setItem(`math_recheck_${className}`, JSON.stringify(queueArray));
   },
 
-  // Full Reset to start a new cycle
   resetActivePool(className) {
     const fullRoster = this.getRoster(className);
     localStorage.setItem(`math_pool_${className}`, JSON.stringify(fullRoster));
